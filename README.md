@@ -1,4 +1,4 @@
-# Project 8：VGA Pong 雙人對戰遊戲 (Atari-Style VGA Pong)
+# Project 8：PingPong Game on VGA monitor 雙人對戰遊戲 (Atari-Style VGA Pong)
 
 ## 項目簡介 (Project Description)
 
