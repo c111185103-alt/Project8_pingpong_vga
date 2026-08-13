@@ -52,7 +52,7 @@ FSM 收在 `pong_game.vhd` 的 process4 裡，三個狀態：`S_WAIT_SERVE`（�
 
 跟 Project 7 一樣改用 UML 循序圖表示，但因為 `pong_game` 用自己的 `game_tick`（100MHz 除頻，硬體預設 `TICK_DIVISOR=1,000,000`，約 100Hz）驅動遊戲邏輯，跟 `vga_timing` 的像素時脈完全脫鉤，圖上把 Process1（game_tick 產生器）、Process3（球拍移動）、Process4（發球/勝負 FSM＋球）各自的生命線並排，展示同一個 `game_tick` edge 到達時三者各自更新的內容跟先後關係，並標出按鍵經 debounce 兩級同步＋穩定計數後才生效的完整過程。
 
-![Project 8 時序規格藍圖](./Project8_diagram/Timespec.drawio.png)
+![Project 8 時序規格藍圖](./Project8_diagram/project8_timespec_combined_1.drawio.png)
 
 ---
 
