@@ -73,15 +73,47 @@ FSM 收在 `pong_game.vhd` 的 process4 裡，三個狀態：`S_WAIT_SERVE`（�
 8. **B 球拍再次被移開，第 2 次真的漏接，觸發贏球**（第 402 clk）：`score_a<=2`，達到 `WIN_SCORE=2` 且領先 `WIN_MARGIN=2`，`game_over<='1'`、`winner_is_a<='1'`。
 9. **贏球後定格**（第 422 clk）：持續按住按鍵，球與雙方球拍座標皆不再變化，直到下次 `rst`。
 
+### 實際模擬波形
+
+`tb_pong_game_chain.vhd` 在 Vivado 上實際跑出的波形，對應上面步驟 4 與步驟 8：紅框是第一次漏接（`score_a` 00→01，`ball_x`／`ball_y` 同時歸位到 `B_WAIT_X`／`SCREEN_H/2`）；藍框是第二次漏接觸發贏球（`score_a` 01→02，`game_over`／`winner_is_a` 同時轉高，比賽結束）。
+
+![Project 8 模擬波形 - 漏接得分與贏球定格](./Project8_diagram/waveform_annotated.png)
+
 ---
 
 ## 五、發球與計分顯示設計細節
 
-球的發球位置固定在發球方球拍側（`ball_x = PADDLE_A_X+PADDLE_W` 或 `PADDLE_B_X-BALL_SIZE`）、垂直置中（`ball_y = SCREEN_H/2`），不是螢幕正中央；發球方要先把球拍移到跟球重疊的高度、再按鍵才會發球——`S_WAIT_SERVE` 狀態每個 `game_tick` 都重新檢查一次「按鍵成立 且 球拍與球垂直重疊」，單純按鍵不會發球。這裡讀的是 debounce 去彈跳後的穩定電位（`btn_level`，程式裡命名為 `btn_a_up_db` 等），跟驅動球拍移動用的是同一組訊號，沒有另外設計專門的發球鍵。reset 後球拍預設垂直置中（`(SCREEN_H-PADDLE_H)/2`），恰好跟球的預設 Y 座標重疊，第一次發球因此只需按鍵；之後漏接方球拍多半已經移到別的位置，需要真的移動過去才能重新發球，且漏接方於下一球擔任發球方。
+### 發球機制
 
-計分與贏家顯示是 `pong_top` 本體三段組合邏輯的核心：分數拆位把 `score_a/score_b` 各自拆成十位、個位（`NUMERIC_STD` 沒有定義 unsigned 的 `/`／`mod`，改用 `to_integer` 轉整數運算，並多做一次 `mod 10` 防呆，避免超出 `digit_value` 的 4-bit 表示範圍造成環繞）；4 個數字框固定畫在畫面上方置中（`SCORE_Y=20`，A 十位/個位在 `A_TENS_X=230`／`A_ONES_X=265`，B 十位/個位在 `B_TENS_X=345`／`B_ONES_X=380`，每格 `DIGIT_W×DIGIT_H=30×50`，整組橫向置中對齊 `SCREEN_W=640`）。贏球後（`game_over='1'`），贏家那兩格改畫 WIN 三個字母（`letter_font`，縮小成 `LETTER_W×LETTER_H=20×50` 對齊數字框高度），畫在贏家分數十位起始的絕對座標（`winner_is_a` 決定用 `A_TENS_X` 或 `B_TENS_X`），輸家那兩格則繼續顯示原本的數字；不論分數或 WIN 字樣，命中的 pixel 一律輸出純白 `"1111"`，配色比照經典 Atari Pong 黑底白圖。
+- 球固定停在發球方球拍側（`ball_x = PADDLE_A_X+PADDLE_W` 或 `PADDLE_B_X-BALL_SIZE`）、垂直置中（`ball_y = SCREEN_H/2`），不是螢幕正中央
+- `S_WAIT_SERVE` 狀態每個 `game_tick` 都重新檢查「按鍵成立 且 球拍與球垂直重疊」兩個條件，同時滿足才會發球；單純按鍵不會發球
+- 讀的是 debounce 去彈跳後的穩定電位（`btn_level`，程式裡命名為 `btn_a_up_db` 等），跟驅動球拍移動用同一組訊號，沒有另外設計專門的發球鍵
+- reset 後球拍預設垂直置中（`(SCREEN_H-PADDLE_H)/2`），恰好跟球的預設 Y 座標重疊，第一次發球因此只需按鍵；之後漏接方球拍多半已移到別處，需要真的移動過去才能重新發球
+- 漏接方於下一球擔任發球方
 
-球拍上下邊界改用明確 clamp 處理（`paddle_a_y_i >= PADDLE_SPEED` 才正常相減，否則直接夾到 `0`；上邊界同理夾到 `SCREEN_H-PADDLE_H`），不只靠減法前的 guard 擋住，因此 `PADDLE_SPEED` 不需要整除邊界距離，球拍仍能精確停在 `0` 或 `SCREEN_H-PADDLE_H`。球拍擊球瞬間沿用 Project 6 同一顆 8-bit LFSR 多項式（`x^8+x^6+x^5+x^4+1`），但用途不同——Project 6 用它從 4 段裡挑球速，這裡只用最低位元決定要不要翻轉垂直方向（機率 50%），`BALL_SPEED` 本身固定不變。
+### 分數與 WIN 字樣顯示
+
+分數拆位把 `score_a/score_b` 各自拆成十位、個位：`NUMERIC_STD` 未定義 unsigned 的 `/`／`mod`，改用 `to_integer` 轉整數運算；多做一次 `mod 10` 防呆，避免超出 `digit_value` 的 4-bit 表示範圍造成環繞。畫面配置固定如下（整組橫向置中對齊 `SCREEN_W=640`）：
+
+| 參數 | 值 | 說明 |
+|---|---|---|
+| `SCORE_Y` | 20 | 分數／WIN 字樣的 Y 座標（畫面上方） |
+| `DIGIT_W`×`DIGIT_H` | 30×50 | 每個數字框尺寸 |
+| `A_TENS_X`／`A_ONES_X` | 230／265 | A 方十位／個位 X 座標 |
+| `B_TENS_X`／`B_ONES_X` | 345／380 | B 方十位／個位 X 座標 |
+| `LETTER_W`×`LETTER_H` | 20×50 | WIN 字母尺寸，縮小對齊 `DIGIT_H` |
+
+贏球後（`game_over='1'`），贏家那兩格改畫 WIN 三個字母（`letter_font`），畫在贏家分數十位起始的絕對座標（`winner_is_a` 決定用 `A_TENS_X` 或 `B_TENS_X`）；輸家那兩格繼續顯示原本數字。不論分數或 WIN 字樣，命中的 pixel 一律輸出純白 `"1111"`，配色比照經典 Atari Pong 黑底白圖。
+
+### 球拍邊界處理
+
+- 上下邊界改用明確 clamp 處理：`paddle_a_y_i >= PADDLE_SPEED` 才正常相減，否則直接夾到 `0`；上邊界同理夾到 `SCREEN_H-PADDLE_H`
+- 不只靠減法前的 guard 擋住，因此 `PADDLE_SPEED` 不需要整除邊界距離，球拍仍能精確停在 `0` 或 `SCREEN_H-PADDLE_H`
+
+### LFSR 球路偏轉
+
+- 球拍擊球瞬間沿用 Project 6 同一顆 8-bit LFSR 多項式（`x^8+x^6+x^5+x^4+1`），但用途不同
+- Project 6 用它從 4 段裡挑球速；這裡只用最低位元決定要不要翻轉垂直方向（機率 50%），`BALL_SPEED` 本身固定不變
 
 ---
 
