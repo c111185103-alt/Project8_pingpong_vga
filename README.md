@@ -54,7 +54,7 @@ FSM 收在 `pong_game.vhd` 的 process4 裡，三個狀態：`S_WAIT_SERVE`（�
 
 ### 遊戲邏輯時序（game_tick，節點 6~9）
 
-圖上把 Process1（game_tick 產生器）、Process2（LFSR 位移器）、Process3（球拍移動）、Process4（發球/勝負 FSM＋球）各自的生命線並排，涵蓋 clk=162~422：B 發球、自然 HIT 觸發 LFSR 讀值、第 2 次漏接觸發贏球、定格驗證（clk=1~162 的完整依賴鏈見下方「四、模擬行為流程」的 AoV 節點 1~5）。圖上刻意把「驅動」跟「讀取」畫成方向相反的兩種箭頭——`Process1` 才是實際驅動 `Process2`／`Process3` 的訊號源頭（兩者各自獨立被 `game_tick` 觸發，跟 `Process4` 無關），`Process4` 對兩者只有讀取關係（`lfsr(0)`、`paddle_b_y` 舊值），並沒有下指令給它們。
+圖上把 Process1（game_tick 產生器）、Process2（LFSR 位移器）、Process3（球拍移動）、Process4（發球/勝負 FSM＋球）各自的生命線並排，涵蓋 clk=162 ~ 422：B 發球、自然 HIT 觸發 LFSR 讀值、第 2 次漏接觸發贏球、定格驗證（clk=1 ~ 162 的完整依賴鏈見下方「四、模擬行為流程」的 AoV 節點 1 ~ 5）。圖上刻意把「驅動」跟「讀取」畫成方向相反的兩種箭頭——`Process1` 才是實際驅動 `Process2`／`Process3` 的訊號源頭（兩者各自獨立被 `game_tick` 觸發，跟 `Process4` 無關），`Process4` 對兩者只有讀取關係（`lfsr(0)`、`paddle_b_y` 舊值），並沒有下指令給它們。
 
 ![Project 8 時序規格藍圖 - 節點6~9](./Project8_diagram/project8_timespec_node6to9.drawio.png)
 
