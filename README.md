@@ -50,9 +50,23 @@ FSM 收在 `pong_game.vhd` 的 process4 裡，三個狀態：`S_WAIT_SERVE`（�
 
 ## 三、時序規格藍圖 (Timing Specifications)
 
-跟 Project 7 一樣改用 UML 循序圖表示，但因為 `pong_game` 用自己的 `game_tick`（100MHz 除頻，硬體預設 `TICK_DIVISOR=1,000,000`，約 100Hz）驅動遊戲邏輯，跟 `vga_timing` 的像素時脈完全脫鉤，圖上把 Process1（game_tick 產生器）、Process3（球拍移動）、Process4（發球/勝負 FSM＋球）各自的生命線並排，展示同一個 `game_tick` edge 到達時三者各自更新的內容跟先後關係，並標出按鍵經 debounce 兩級同步＋穩定計數後才生效的完整過程。
+跟 Project 7 一樣改用 UML 循序圖表示。`pong_game` 用自己的 `game_tick`（100MHz 除頻，硬體預設 `TICK_DIVISOR=1,000,000`，約 100Hz）驅動遊戲邏輯，跟 `vga_timing` 的像素時脈完全脫鉤，因此拆成兩組時序圖分開呈現：遊戲邏輯時序看 `game_tick` 的節奏，VGA 畫面時序看像素時脈的節奏。
 
-![Project 8 時序規格藍圖](./Project8_diagram/project8_timespec_combined_1.drawio.png)
+### 遊戲邏輯時序（game_tick，節點 1~9）
+
+圖上把 Process1（game_tick 產生器）、Process3（球拍移動）、Process4（發球/勝負 FSM＋球）各自的生命線並排，展示同一個 `game_tick` edge 到達時各自更新的內容跟先後關係，並標出按鍵經 debounce 兩級同步＋穩定計數後才生效的完整過程，涵蓋 clk=1~162（節點 1~5）。
+
+![Project 8 時序規格藍圖 - 節點1~5](./Project8_diagram/project8_timespec_combined_1.drawio.png)
+
+延續上圖到 clk=162~422（節點 6~9）：自然 HIT 觸發 LFSR 讀值、第 2 次漏接觸發贏球、定格驗證。額外把 Process2（LFSR 位移器）獨立成一條 lifeline；圖上刻意把「驅動」跟「讀取」畫成方向相反的兩種箭頭——`Process1` 才是實際驅動 `Process2`／`Process3` 的訊號源頭（兩者各自獨立被 `game_tick` 觸發，跟 `Process4` 無關），`Process4` 對兩者只有讀取關係（`lfsr(0)`、`paddle_b_y` 舊值），並沒有下指令給它們。
+
+![Project 8 時序規格藍圖 - 節點6~9](./Project8_diagram/project8_timespec_node6to9.drawio.png)
+
+### VGA 畫面時序（pixel_tick，單一 frame）
+
+另一個獨立時脈網域：`vga_timing` 把 100MHz 除頻成 `pixel_tick`，水平掃描 `h_cnt`（800 個 pixel_tick／列）巢狀包在垂直掃描 `v_cnt`（525 列／frame）裡面。`pong_render` 與 `pong_top` 本體的分數/WIN 疊加全部是組合邏輯，同一個 `pixel_tick` 內零延遲完成，不像 Project 7 有 block RAM 讀取延遲要處理；`hsync`/`vsync` 則由 `vga_timing` 直接輸出，不經過這條渲染鏈。整個 frame 週期 `800×525×4=1,680,000 clk`，100MHz 下約 16.8ms（≈59.5Hz 更新率）。
+
+![Project 8 VGA 單一 frame 時序](./Project8_diagram/project8_vga_frame_timespec.drawio.png)
 
 ---
 
